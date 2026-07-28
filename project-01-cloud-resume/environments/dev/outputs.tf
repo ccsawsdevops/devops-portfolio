@@ -1,8 +1,12 @@
 # environments/dev/outputs.tf
+output "cloudfront_domain" {
+  description = "CloudFront distribution domain name"
+  value       = module.cloudfront.cloudfront_domain_name
+}
 
-output "website_endpoint" {
-  description = "S3 website endpoint"
-  value       = module.s3_website.website_endpoint
+output "api_endpoint" {
+  description = "API Gateway endpoint"
+  value       = module.api_gateway.api_endpoint
 }
 
 output "dynamodb_table_name" {

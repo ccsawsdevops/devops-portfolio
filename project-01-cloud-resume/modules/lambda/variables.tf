@@ -32,3 +32,7 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+variable "dynamodb_table_arn" {
+  description = "ARN of the DynamoDB table for Lambda access"
+  type        = string
+}

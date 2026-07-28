@@ -20,12 +20,33 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# DynamoDB access policy
+resource "aws_iam_role_policy" "dynamodb_access" {
+  name = "${var.function_name}-dynamodb-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem"
+        ]
+        Resource = var.dynamodb_table_arn
+      }
+    ]
+  })
+}
+
 resource "aws_lambda_function" "function" {
-  function_name = var.function_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = var.handler
-  runtime       = var.runtime
-  filename      = var.filename
+  function_name    = var.function_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = var.handler
+  runtime          = var.runtime
+  filename         = var.filename
   source_code_hash = filebase64sha256(var.filename)
 
   environment {
@@ -33,4 +54,6 @@ resource "aws_lambda_function" "function" {
   }
 
   tags = var.tags
+
+  depends_on = [aws_iam_role_policy.dynamodb_access]
 }

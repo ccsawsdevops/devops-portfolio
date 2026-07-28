@@ -31,7 +31,7 @@ locals {
   }
 }
 
-# S3 Website Module
+# S3 Bucket
 module "s3_website" {
   source = "../../modules/s3-website"
 
@@ -39,11 +39,54 @@ module "s3_website" {
   tags        = local.common_tags
 }
 
-# DynamoDB Module
+# DynamoDB Table
 module "dynamodb" {
   source = "../../modules/dynamodb"
 
   table_name = "${local.project}-${local.environment}-visits"
   hash_key   = "id"
   tags       = local.common_tags
+}
+
+# Lambda Function
+module "lambda" {
+  source = "../../modules/lambda"
+
+  function_name = "${local.project}-${local.environment}-counter"
+  handler       = "lambda.handler"
+  runtime       = "python3.11"
+  filename      = "${path.module}/src/lambda.zip"
+  dynamodb_table_arn = module.dynamodb.table_arn
+
+  environment_variables = {
+    TABLE_NAME = module.dynamodb.table_name
+  }
+
+  tags = local.common_tags
+}
+
+# API Gateway
+module "api_gateway" {
+  source = "../../modules/api-gateway"
+
+  api_name           = "${local.project}-${local.environment}-api"
+  project_name       = local.project
+  resource_path      = "visits"
+  http_method        = "GET"
+  lambda_invoke_arn  = module.lambda.invoke_arn
+  lambda_function_name = module.lambda.function_name
+  stage_name         = local.environment
+  tags               = local.common_tags
+}
+
+# CloudFront CDN
+module "cloudfront" {
+  source = "../../modules/cloudfront"
+
+  bucket_name                    = module.s3_website.bucket_id
+  s3_bucket_regional_domain_name = module.s3_website.bucket_regional_domain_name
+  s3_bucket_arn                  = module.s3_website.bucket_arn
+  s3_bucket_id                   = module.s3_website.bucket_id
+  project_name                   = local.project
+  tags                           = local.common_tags
 }
