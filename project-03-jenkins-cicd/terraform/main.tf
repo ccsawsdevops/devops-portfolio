@@ -98,7 +98,7 @@ resource "aws_instance" "jenkins" {
   iam_instance_profile   = aws_iam_instance_profile.jenkins_profile.name
   key_name               = var.key_pair_name
 
-  user_data = <<-EOF
+      user_data = <<-EOF
               #!/bin/bash
               set -e
 
@@ -119,9 +119,33 @@ resource "aws_instance" "jenkins" {
               mkdir -p /opt/jenkins
               chown -R ec2-user:ec2-user /opt/jenkins
 
-              echo "Docker installation complete" > /var/log/docker-install.log
-              EOF
+              # Create docker-compose.yml with your pre-built image
+              cat > /opt/jenkins/docker-compose.yml << 'DOCKEREOF'
+              version: '3.8'
+              services:
+                jenkins:
+                  image: ccsawsdevops/jenkins-terraform:latest
+                  container_name: jenkins
+                  user: root
+                  ports:
+                    - "8080:8080"
+                    - "50000:50000"
+                  volumes:
+                    - jenkins_home:/var/jenkins_home
+                  environment:
+                    - JAVA_OPTS=-Djenkins.install.runSetupWizard=true
+                  restart: unless-stopped
+              volumes:
+                jenkins_home:
+              DOCKEREOF
 
+              # Pull and start Jenkins
+              cd /opt/jenkins
+              docker-compose pull
+              docker-compose up -d
+
+              echo "Jenkins started successfully" > /var/log/jenkins-start.log
+              EOF
   tags = {
     Name = "jenkins-docker-server"
   }
