@@ -21,8 +21,8 @@ provider "aws" {
 
 # Security Group for Jenkins
 resource "aws_security_group" "jenkins" {
-  name        = "jenkins-sg"
-  description = "Security group for Jenkins server"
+  name        = "jenkins-docker-sg"
+  description = "Security group for Jenkins Docker server"
 
   ingress {
     description = "SSH"
@@ -48,13 +48,13 @@ resource "aws_security_group" "jenkins" {
   }
 
   tags = {
-    Name = "jenkins-sg"
+    Name = "jenkins-docker-sg"
   }
 }
 
-# IAM Role for Jenkins EC2
+# IAM Role for EC2
 resource "aws_iam_role" "jenkins_role" {
-  name = "jenkins-ec2-role"
+  name = "jenkins-docker-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -76,11 +76,11 @@ resource "aws_iam_role_policy_attachment" "jenkins_admin" {
 }
 
 resource "aws_iam_instance_profile" "jenkins_profile" {
-  name = "jenkins-instance-profile"
+  name = "jenkins-docker-profile"
   role = aws_iam_role.jenkins_role.name
 }
 
-# EC2 Instance for Jenkins
+# EC2 Instance
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -102,42 +102,27 @@ resource "aws_instance" "jenkins" {
               #!/bin/bash
               set -e
 
-              # Update system
+              # Update and install Docker
               dnf update -y
+              dnf install -y docker
+              systemctl start docker
+              systemctl enable docker
 
-              # Install Java 17
-              dnf install -y java-17-amazon-corretto
+              # Install Docker Compose
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
 
-              # Install Jenkins
-              wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
-              rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-              dnf install -y jenkins
+              # Add ec2-user to docker group
+              usermod -aG docker ec2-user
 
-              # Start Jenkins
-              systemctl enable jenkins
-              systemctl start jenkins
+              # Create Jenkins directory
+              mkdir -p /opt/jenkins
+              chown -R ec2-user:ec2-user /opt/jenkins
 
-              # Install Git
-              dnf install -y git
-
-              # Install Terraform
-              dnf install -y dnf-plugins-core
-              dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
-              dnf install -y terraform
-
-              # Install AWS CLI v2
-              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-              unzip -q awscliv2.zip
-              ./aws/install
-              rm -rf aws awscliv2.zip
-
-              # Install tfsec for security scanning
-              curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-
-              echo "Jenkins installation complete" > /var/log/jenkins-install.log
+              echo "Docker installation complete" > /var/log/docker-install.log
               EOF
 
   tags = {
-    Name = "jenkins-server"
+    Name = "jenkins-docker-server"
   }
 }

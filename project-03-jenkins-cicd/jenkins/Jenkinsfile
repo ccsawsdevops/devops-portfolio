@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/ccsawsdevops/devops-portfolio.git'
+            }
+        }
+
+        stage('Terraform Format') {
+            steps {
+                dir('project-01-cloud-resume/environments/dev') {
+                    sh 'terraform fmt -check -recursive'
+                }
+            }
+        }
+
+        stage('Terraform Validate') {
+            steps {
+                dir('project-01-cloud-resume/environments/dev') {
+                    sh 'terraform init -backend=false'
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                dir('project-01-cloud-resume/environments/dev') {
+                    sh 'terraform init'
+                    sh 'terraform plan -out=tfplan'
+                }
+            }
+        }
+
+        stage('Approval') {
+            steps {
+                input message: 'Deploy to dev?', ok: 'Deploy'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('project-01-cloud-resume/environments/dev') {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo 'Deployment failed!'
+        }
+    }
+}
